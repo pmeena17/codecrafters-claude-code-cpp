@@ -14,6 +14,10 @@ calling, agent loop, and how to integrate multiple tools into an AI assistant.
 **Note**: If you're viewing this repo on GitHub, head over to
 [codecrafters.io](https://codecrafters.io) to try the challenge.
 
+# OpenRouter's API Guide
+
+[OpenRouter's API Guide](https://openrouter.ai/docs/api/reference/overview)
+
 # Passing the first stage
 
 The entry point for your `claude-code` implementation is in `src/main.cpp`.
@@ -32,3 +36,13 @@ Note: This section is for stages 2 and beyond.
    `src/main.cpp`.
 3. Run `codecrafters submit` to submit your solution to CodeCrafters. Test
    output will be streamed to your terminal.
+
+# Build Process
+
+Note: cmake and vcpkg must be installed for build.
+
+```sh
+rm -rf build
+./your_program.sh
+```
+You might need to run `export VCPKG_ROOT=/home/pmeena/Development/vcpkg` beforehand. Although I added it to ~/.bashrc, I had to manually run this in terminal before building.

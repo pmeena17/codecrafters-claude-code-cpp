@@ -37,9 +37,29 @@ int main(int argc, char *argv[])
         return 1;
     }
 
+    json read_tool = {
+        {"type", "function"},
+        {"function", {
+            {"name", "myRead"},
+            {"description", "Read and return the contents of a file"},
+            {"parameters", {
+                {"type", "object"},
+                {"properties", {
+                    {"file_path", {
+                        {"type", "string"},
+                        {"description", "The path to the file to read"}
+                    }}
+                }},
+                {"required", json::array({"file_path"})}
+            }}
+        }}
+    };
+
     json request_body = {
         {"model", "anthropic/claude-haiku-4.5"},
-        {"messages", json::array({{{"role", "user"}, {"content", prompt}}})}};
+        {"messages", json::array({{{"role", "user"}, {"content", prompt}}})},
+        {"tools", json::array({read_tool})}
+    };
 
     cpr::Response response = cpr::Post(
         cpr::Url{base_url + "/chat/completions"},
