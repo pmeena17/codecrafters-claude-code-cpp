@@ -1,11 +1,50 @@
 #include <cstdlib>
 #include <iostream>
 #include <string>
+#include <cassert>
 
 #include <cpr/cpr.h>
 #include <nlohmann/json.hpp>
 
 using json = nlohmann::json;
+
+void HandleToolCalls(const json &result)
+{
+    // return if tool_calls doesn't exist or if it's empty
+    if (!result["choices"][0]["message"].contains("tool_calls")
+        || result["choices"][0]["message"]["tool_calls"].empty())
+        return;
+
+    // extract tool_calls as json array
+    json toolCalls = result["choices"][0]["message"]["tool_calls"];
+    assert(toolCalls.is_array() && "tool_calls must be a JSON array");
+
+    // parse to get function name and arguments
+    for (const auto &call : toolCalls)
+    {
+        std::string sFuncName = call["function"]["name"].get<std::string>();
+        json funcArgs = json::parse(call["function"]["arguments"].get<std::string>()); // Explicit conversion to std::string
+        std::string sFilePath = funcArgs["file_path"].get<std::string>();              // Added .get<std::string>() for consistency
+
+        // 1. Read tool
+        if (sFuncName == "myRead")
+        {
+            // Read the file
+            std::ifstream file(sFilePath);
+            if (file.is_open())
+            {
+                std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+                file.close();
+                // print content
+                std::cout << content << std::endl;
+            }
+            else
+            {
+                std::cerr << "Error: Could not open file " << sFilePath << std::endl;
+            }
+        }
+    }
+}
 
 int main(int argc, char *argv[])
 {
@@ -103,40 +142,7 @@ int main(int argc, char *argv[])
     }
 
     // check the result for tools and execute tool call
-    // TODO:
-    // 4. execute the tool. for myRead, use c++ lib to read the file at file_path
-    // 5. output the result of myRead
-    if (result["choices"][0]["message"].contains("tool_calls") && !result["choices"][0]["message"]["tool_calls"].empty())
-    {
-        // extract tool_calls as json array
-        json toolCalls = result["choices"][0]["message"]["tool_calls"];
-
-        // parse to get function name and arguments
-        for (const auto &call : toolCalls)
-        {
-            std::string sFuncName = call["function"]["name"].get<std::string>();
-            json funcArgs = json::parse(call["function"]["arguments"].get<std::string>());  // Explicit conversion to std::string
-            std::string sFilePath = funcArgs["file_path"].get<std::string>();  // Added .get<std::string>() for consistency
-
-            // Read tool
-            if (sFuncName == "myRead")
-            {
-                // Read the file
-                std::ifstream file(sFilePath);
-                if (file.is_open())
-                {
-                    std::string content((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
-                    file.close();
-                    // print content
-                    std::cout << content << std::endl;
-                }
-                else
-                {
-                    std::cerr << "Error: Could not open file " << sFilePath << std::endl;
-                }
-            }
-        }
-    }
+    HandleToolCalls(result);
 
     // You can use print statements as follows for debugging, they'll be visible when running tests.
     std::cerr << "Logs from your program will appear here!" << std::endl;
