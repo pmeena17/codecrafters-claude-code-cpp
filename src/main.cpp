@@ -18,20 +18,36 @@ void HandleToolCalls(const json &result, json& messages)
     for (const auto &call : toolCalls)
     {
         std::string sName = call["function"]["name"].get<std::string>();
-        json args = json::parse(call["function"]["arguments"].get<std::string>()); // Explicit conversion to std::string
+        json args = json::parse(call["function"]["arguments"].get<std::string>());
         std::string sCallId = call["id"].get<std::string>();
+        std::string sFilePath = args["file_path"].get<std::string>();
         std::string sResult;
-
+        
         // 1. Read tool
         if (sName == "myRead")
         {
-            std::string sFilePath = args["file_path"].get<std::string>();
             // Read the file
             std::ifstream file(sFilePath);
             if (file.is_open())
             {
                 sResult = std::string((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
                 file.close();
+            }
+            else
+            sResult = "Error: Could not open file " + sFilePath;
+        }
+        else if (sName == "myWrite") // 2. Write tool
+        {
+            // extract content to write in the file
+            std::string sContent = args["content"].get<std::string>();
+
+            // Write to the file (append if exists, create if not)
+            std::ofstream file(sFilePath, std::ios::app);
+            if (file.is_open())
+            {
+                file << sContent;
+                file.close();
+                sResult = sContent;
             }
             else
                 sResult = "Error: Could not open file " + sFilePath;
@@ -76,10 +92,15 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    // define a tool that can allow the model to read content
+    // define a tool that allows the model to read content
     json read_tool = {
         {"type", "function"},
         {"function", {{"name", "myRead"}, {"description", "Read and return the contents of a file"}, {"parameters", {{"type", "object"}, {"properties", {{"file_path", {{"type", "string"}, {"description", "The path to the file to read"}}}}}, {"required", json::array({"file_path"})}}}}}};
+
+    // define a tool that allows the model to write content
+    json write_tool = {
+        {"type", "function"},
+        {"function", {{"name", "myWrite"}, {"description", "Write content to a file"}, {"parameters", {{"type", "object"}, {"properties", {{"file_path", {{"type", "string"}, {"description", "The path of the file to write to"}}}, {"content", {{"type", "string"}, {"description", "The content to write to the file"}}}}}, {"required", json::array({"file_path", "content"})}}}}}};
 
     // Initial messages
     json messages = json::array({{{"role", "user"}, {"content", prompt}}});
@@ -91,7 +112,7 @@ int main(int argc, char *argv[])
         json request_body = {
             {"model", "anthropic/claude-haiku-4.5"},
             {"messages", messages},
-            {"tools", json::array({read_tool})}};
+            {"tools", json::array({read_tool, write_tool})}};
 
         // create the http request and use cpr to send a POST request
         cpr::Response response = cpr::Post(
