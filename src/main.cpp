@@ -20,12 +20,12 @@ void HandleToolCalls(const json &result, json& messages)
         std::string sName = call["function"]["name"].get<std::string>();
         json args = json::parse(call["function"]["arguments"].get<std::string>());
         std::string sCallId = call["id"].get<std::string>();
-        std::string sFilePath = args["file_path"].get<std::string>();
         std::string sResult;
         
         // 1. Read tool
         if (sName == "myRead")
         {
+            std::string sFilePath = args["file_path"].get<std::string>();
             // Read the file
             std::ifstream file(sFilePath);
             if (file.is_open())
@@ -38,6 +38,7 @@ void HandleToolCalls(const json &result, json& messages)
         }
         else if (sName == "myWrite") // 2. Write tool
         {
+            std::string sFilePath = args["file_path"].get<std::string>();
             // extract content to write in the file
             std::string sContent = args["content"].get<std::string>();
 
@@ -51,6 +52,23 @@ void HandleToolCalls(const json &result, json& messages)
             }
             else
                 sResult = "Error: Could not open file " + sFilePath;
+        }
+        else if (sName == "myBash") // 3. Bash tool
+        {
+            // extract the command to execute and append "2>&1" to capture stderr along with stdout
+            std::string sCommand = args["command"].get<std::string>() + " 2>&1";
+
+            // execute the shell command via popen
+            FILE *pipe = popen(sCommand.c_str(), "r");
+            if (pipe)
+            {
+                char buffer[128];
+                while (fgets(buffer, sizeof(buffer), pipe))
+                    sResult += buffer; // read output into result
+                pclose(pipe); // gives the exit code
+            }
+            else
+                sResult = "Error: Could not execute command";
         }
 
         messages.push_back({ {"role", "tool"},
@@ -102,6 +120,10 @@ int main(int argc, char *argv[])
         {"type", "function"},
         {"function", {{"name", "myWrite"}, {"description", "Write content to a file"}, {"parameters", {{"type", "object"}, {"properties", {{"file_path", {{"type", "string"}, {"description", "The path of the file to write to"}}}, {"content", {{"type", "string"}, {"description", "The content to write to the file"}}}}}, {"required", json::array({"file_path", "content"})}}}}}};
 
+    json bash_tool = {
+        {"type", "function"},
+        {"function", {{"name", "myBash"}, {"description", "Execute a shell command"}, {"parameters", {{"type", "object"}, {"properties", {{"command", {{"type", "string"}, {"description", "The command to execute"}}}}}, {"required", json::array({"command"})}}}}}};
+
     // Initial messages
     json messages = json::array({{{"role", "user"}, {"content", prompt}}});
 
@@ -112,7 +134,7 @@ int main(int argc, char *argv[])
         json request_body = {
             {"model", "anthropic/claude-haiku-4.5"},
             {"messages", messages},
-            {"tools", json::array({read_tool, write_tool})}};
+            {"tools", json::array({read_tool, write_tool, bash_tool})}};
 
         // create the http request and use cpr to send a POST request
         cpr::Response response = cpr::Post(
